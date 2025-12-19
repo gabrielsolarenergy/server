@@ -2,6 +2,8 @@ import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
+
+import resend
 from jinja2 import Template
 from pathlib import Path
 import logging
@@ -117,6 +119,8 @@ EMAIL_TEMPLATES = {
     """
 }
 
+resend.api_key = settings.SMTP_PASSWORD
+
 
 async def send_email(
         to_email: str,
@@ -126,33 +130,24 @@ async def send_email(
         attachments: list = None
 ):
     try:
+        # 1. Generăm HTML-ul folosind template-urile tale frumoase
         template = Template(EMAIL_TEMPLATES[template_name])
         html_content = template.render(**context)
 
-        message = MIMEMultipart("alternative")
-        message["Subject"] = subject
-        message["From"] = f"{settings.EMAILS_FROM_NAME} <{settings.EMAILS_FROM_EMAIL}>"
-        message["To"] = to_email
+        # 2. Trimitem folosind SDK-ul oficial (echivalentul codului tău de JS)
+        params = {
+            "from": f"{settings.EMAILS_FROM_NAME} <{settings.EMAILS_FROM_EMAIL}>",
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+        }
 
-        html_part = MIMEText(html_content, "html")
-        message.attach(html_part)
+        # Trimitere e-mail
+        email_response = resend.Emails.send(params)
 
-        if attachments:
-            for attachment in attachments:
-                message.attach(attachment)
-
-        await aiosmtplib.send(
-            message,
-            hostname=settings.SMTP_HOST,
-            port=settings.SMTP_PORT,
-            start_tls=True,
-            username=settings.SMTP_USER,
-            password=settings.SMTP_PASSWORD,
-        )
-
-        logger.info(f"Email sent successfully to {to_email}")
+        logger.info(f"Email trimis prin Resend API către {to_email}. ID: {email_response['id']}")
         return True
 
     except Exception as e:
-        logger.error(f"Failed to send email to {to_email}: {str(e)}")
+        logger.error(f"Eroare Resend API la trimiterea către {to_email}: {str(e)}")
         return False
