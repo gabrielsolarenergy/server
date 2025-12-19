@@ -144,3 +144,29 @@ def verify_2fa_code(secret: str, code: str) -> bool:
 def generate_verification_code() -> str:
     """Generează un cod de 6 cifre"""
     return ''.join(random.choices(string.digits, k=6))
+
+
+def create_email_token(email: str, type: str = "verify") -> str:
+    """Generează un token JWT pentru email (verificare sau resetare parolă)"""
+    # Expiră în 24h pentru verificare, 15min pentru resetare
+    expires_delta = timedelta(hours=24) if type == "verify" else timedelta(minutes=15)
+    expire = datetime.utcnow() + expires_delta
+
+    to_encode = {
+        "exp": expire,
+        "sub": email,
+        "type": type
+    }
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt
+
+
+def decode_email_token(token: str, expected_type: str) -> Optional[str]:
+    """Validează token-ul și returnează email-ul conținut"""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != expected_type:
+            return None
+        return payload.get("sub")
+    except JWTError:
+        return None

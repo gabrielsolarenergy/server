@@ -9,7 +9,7 @@ from typing import List
 from backend.app.core.security import (
     hash_password, verify_password, create_access_token, create_refresh_token,
     create_email_token, verify_token, get_current_user, generate_2fa_secret,
-    generate_2fa_qr, verify_2fa_code, generate_verification_code
+    generate_2fa_qr, verify_2fa_code, generate_verification_code, decode_email_token
 )
 from backend.app.core.email import send_email
 from backend.app.core.config import settings
@@ -25,29 +25,19 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # --- 1. ÎNREGISTRARE ---
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(
-        user_data: UserCreate,
-        bg_tasks: BackgroundTasks,
-        db: Session = Depends(get_db)
-):
-    # 1. Verificăm dacă email-ul există
+async def register(user_data: UserCreate, bg_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user_data.email).first()
 
     if existing_user:
-        # Dacă userul există dar NU e verificat, îl trimitem la pagina de verify
         if not existing_user.is_verified:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Acest cont există deja dar nu este activat. Verifică email-ul."
-            )
-        raise HTTPException(status_code=400, detail="Acest email este deja înregistrat.")
+            token = create_email_token(existing_user.email, "verify")
+            verify_link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+            bg_tasks.add_task(send_email, to_email=existing_user.email, subject="Activează Contul Gabriel Solar",
+                              template_name="verify_email",
+                              context={"first_name": existing_user.first_name, "verify_link": verify_link})
+            return {"message": "Cont existent dar neactivat. Un nou link a fost trimis."}
+        raise HTTPException(status_code=400, detail="Email deja înregistrat.")
 
-    # 2. Generăm codul și îi facem hash
-    plain_code = generate_verification_code()
-    print(f"\n[DEBUG] Codul de verificare pentru {user_data.email} este: {plain_code}\n")
-    hashed_code = hash_password(plain_code)
-
-    # 3. Creăm utilizatorul
     new_user = User(
         email=user_data.email,
         hashed_password=hash_password(user_data.password),
@@ -55,49 +45,35 @@ async def register(
         last_name=user_data.last_name,
         phone_number=user_data.phone_number,
         location=user_data.location,
-        role="user",
-        is_verified=False,
-        verification_code_hash=hashed_code  # Coloana adăugată în DB
+        is_verified=False
     )
-
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
-    # 5. Trimitere Email cu codul ÎN CLAR (plain_code)
-    bg_tasks.add_task(
-        send_email,
-        to_email=new_user.email,
-        subject="Cod Activare Gabriel Solar Energy",
-        template_name="verify_email_code",
-        context={
-            "first_name": new_user.first_name,
-            "code": plain_code  # Utilizatorul primește 123456
-        }
-    )
+    token = create_email_token(new_user.email, "verify")
+    verify_link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
 
-    print(f"DEBUG: Codul pentru {new_user.email} este {plain_code}")  # Vezi codul în consolă
+    bg_tasks.add_task(send_email, to_email=new_user.email, subject="Bun venit! Confirmă email-ul",
+                      template_name="verify_email",
+                      context={"first_name": new_user.first_name, "verify_link": verify_link})
 
-    return {"message": "Cont creat. Te rugăm să introduci codul de activare."}
+    return {"message": "Cont creat. Verifică email-ul pentru activare."}
 
 
-@router.post("/verify-code")
-async def verify_code(data: EmailVerification, db: Session = Depends(get_db)):
-    # Accesăm datele din obiectul 'data'
-    user = db.query(User).filter(User.email == data.email).first()
+@router.get("/verify-email")  # Schimbat din POST in GET pentru a fi accesat direct din browser
+async def verify_email(token: str, db: Session = Depends(get_db)):
+    email = decode_email_token(token, "verify")
+    if not email:
+        raise HTTPException(status_code=400, detail="Link invalid sau expirat.")
 
+    user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="Utilizator negăsit.")
 
-    # Verificăm hash-ul codului folosind data.code
-    if not user.verification_code_hash or not verify_password(data.code, user.verification_code_hash):
-        raise HTTPException(status_code=400, detail="Codul de activare este incorect.")
-
     user.is_verified = True
-    user.verification_code_hash = None
     db.commit()
-
-    return {"success": True, "message": "Cont activat cu succes!"}
+    return {"success": True, "message": "Cont activat! Te poți loga."}
 
 # --- 2. LOGIN & SESIUNI ---
 @router.post("/login", response_model=TokenResponse)
@@ -230,15 +206,8 @@ async def forgot_password(email: str, bg_tasks: BackgroundTasks, db: Session = D
     if user:
         reset_token = create_email_token(user.email, "reset")
         reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
-
-        bg_tasks.add_task(
-            send_email,
-            to_email=user.email,
-            subject="Resetare Parolă Gabriel Solar",
-            template_name="reset_password",
-            context={"first_name": user.first_name, "reset_link": reset_link}
-        )
-    # Returnăm succes chiar dacă user-ul nu există pentru a preveni "User Enumeration"
+        bg_tasks.add_task(send_email, to_email=user.email, subject="Resetare Parolă",
+                         template_name="reset_password", context={"first_name": user.first_name, "reset_link": reset_link})
     return {"message": "Dacă email-ul există, un link de resetare a fost trimis."}
 
 

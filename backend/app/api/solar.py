@@ -51,22 +51,11 @@ async def get_blog_post(slug: str, db: Session = Depends(get_db)):
 
 # --- LEAD MANAGEMENT (Contact) ---
 @router.post("/contact")
-async def submit_contact(
-        data: ContactLeadCreate,
-        bg_tasks: BackgroundTasks,
-        db: Session = Depends(get_db)
-):
+async def submit_contact(data: ContactLeadCreate, bg_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     new_lead = ContactLead(**data.dict())
     db.add(new_lead)
     db.commit()
-    db.refresh(new_lead)
 
-    bg_tasks.add_task(
-        send_email,
-        to_email=settings.SMTP_USER,
-        subject="🚀 Lead Nou - Gabriel Solar",
-        template_name="contact_notification",
-        context=data.dict()
-    )
-
-    return {"message": "Solicitarea a fost primită. Echipa Gabriel Solar te va contacta în cel mai scurt timp!"}
+    bg_tasks.add_task(send_email, to_email=settings.SMTP_USER, subject="🚀 Lead Nou - Gabriel Solar",
+                      template_name="contact_notification", context=data.dict())
+    return {"message": "Solicitarea a fost primită!"}
