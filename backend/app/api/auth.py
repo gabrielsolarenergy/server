@@ -1,12 +1,15 @@
+import random
+import string
+
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from backend.app.core.security import (
     hash_password, verify_password, create_access_token, create_refresh_token,
     create_email_token, verify_token, get_current_user, generate_2fa_secret,
-    generate_2fa_qr, verify_2fa_code
+    generate_2fa_qr, verify_2fa_code, generate_verification_code
 )
 from backend.app.core.email import send_email
 from backend.app.core.config import settings
@@ -14,7 +17,7 @@ from backend.app.core.rate_limit import rate_limit_dependency
 from backend.app.models.database import get_db, User, UserSession, AuditLog
 from backend.app.schemas import (
     UserCreate, UserLogin, TokenResponse, UserOut,
-    PasswordReset, UserOutWith2FA
+    PasswordReset, UserOutWith2FA, EmailVerification
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -27,11 +30,24 @@ async def register(
         bg_tasks: BackgroundTasks,
         db: Session = Depends(get_db)
 ):
-    # Verificare dacă email-ul există deja
-    if db.query(User).filter(User.email == user_data.email).first():
+    # 1. Verificăm dacă email-ul există
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
+
+    if existing_user:
+        # Dacă userul există dar NU e verificat, îl trimitem la pagina de verify
+        if not existing_user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Acest cont există deja dar nu este activat. Verifică email-ul."
+            )
         raise HTTPException(status_code=400, detail="Acest email este deja înregistrat.")
 
-    # Creare User
+    # 2. Generăm codul și îi facem hash
+    plain_code = generate_verification_code()
+    print(f"\n[DEBUG] Codul de verificare pentru {user_data.email} este: {plain_code}\n")
+    hashed_code = hash_password(plain_code)
+
+    # 3. Creăm utilizatorul
     new_user = User(
         email=user_data.email,
         hashed_password=hash_password(user_data.password),
@@ -40,27 +56,48 @@ async def register(
         phone_number=user_data.phone_number,
         location=user_data.location,
         role="user",
-        is_verified=False
+        is_verified=False,
+        verification_code_hash=hashed_code  # Coloana adăugată în DB
     )
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
-    # Generare Token Verificare Email
-    verify_token_str = create_email_token(new_user.email, "verify")
-    verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verify_token_str}"
-
-    # Trimitere Email asincron (Background Task)
+    # 5. Trimitere Email cu codul ÎN CLAR (plain_code)
     bg_tasks.add_task(
         send_email,
         to_email=new_user.email,
-        subject="Activare Cont Gabriel Solar Energy",
-        template_name="verify_email",
-        context={"first_name": new_user.first_name, "verify_link": verify_link}
+        subject="Cod Activare Gabriel Solar Energy",
+        template_name="verify_email_code",
+        context={
+            "first_name": new_user.first_name,
+            "code": plain_code  # Utilizatorul primește 123456
+        }
     )
 
-    return {"message": "Cont creat. Te rugăm să îți verifici email-ul pentru activare."}
+    print(f"DEBUG: Codul pentru {new_user.email} este {plain_code}")  # Vezi codul în consolă
 
+    return {"message": "Cont creat. Te rugăm să introduci codul de activare."}
+
+
+@router.post("/verify-code")
+async def verify_code(data: EmailVerification, db: Session = Depends(get_db)):
+    # Accesăm datele din obiectul 'data'
+    user = db.query(User).filter(User.email == data.email).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilizator negăsit.")
+
+    # Verificăm hash-ul codului folosind data.code
+    if not user.verification_code_hash or not verify_password(data.code, user.verification_code_hash):
+        raise HTTPException(status_code=400, detail="Codul de activare este incorect.")
+
+    user.is_verified = True
+    user.verification_code_hash = None
+    db.commit()
+
+    return {"success": True, "message": "Cont activat cu succes!"}
 
 # --- 2. LOGIN & SESIUNI ---
 @router.post("/login", response_model=TokenResponse)
@@ -69,49 +106,67 @@ async def login(
         login_data: UserLogin,
         db: Session = Depends(get_db)
 ):
+    # 1. Căutare utilizator
     user = db.query(User).filter(User.email == login_data.email).first()
 
-    # Protecție Brute-Force: Rate limiting aplicat pe acest endpoint
+    # 2. Verificare credențiale (Protecție timing attacks)
     if not user or not verify_password(login_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Email sau parolă incorectă.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email sau parolă incorectă."
+        )
 
+    # 3. Blocare cont neverificat (Triggers React Redirect)
     if not user.is_verified:
-        raise HTTPException(status_code=403, detail="Contul nu este verificat. Verifică email-ul.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Contul nu este verificat. Verifică email-ul."
+        )
 
-    # Verificare 2FA (dacă este activat)
+    # 4. Verificare 2FA (dacă este activat)
     if user.two_factor_enabled:
         if not login_data.totp_code:
+            # Returnăm un răspuns parțial care indică necesitatea 2FA
             return {
                 "access_token": "pending_2fa",
                 "refresh_token": "pending_2fa",
-                "user": user,
+                "user": None,  # Nu trimitem datele userului până nu e validat 2FA
                 "requires_2fa": True
             }
         if not verify_2fa_code(user.two_factor_secret, login_data.totp_code):
             raise HTTPException(status_code=401, detail="Cod 2FA invalid.")
 
-    # Generare Token-uri
+    # 5. Generare Token-uri (folosim ID-ul ca subiect)
     access_token = create_access_token(data={"sub": str(user.id)})
     refresh_token = create_refresh_token(data={"sub": str(user.id)})
 
-    # Gestionare Sesiuni: Permite logout centralizat
+    # 6. Gestionare Sesiuni
+    now = datetime.now(timezone.utc)
     new_session = UserSession(
         user_id=user.id,
         refresh_token=refresh_token,
         ip_address=request.client.host,
         device_info=request.headers.get("user-agent", "Unknown"),
-        expires_at=datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        expires_at=now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     )
     db.add(new_session)
 
-    # Update ultimul login
-    user.last_login = datetime.utcnow()
+    # 7. Update Metadata & Audit
+    user.last_login = now
 
-    # Audit Log
-    log = AuditLog(user_id=user.id, action="LOGIN", ip_address=request.client.host)
+    log = AuditLog(
+        user_id=user.id,
+        action="LOGIN",
+        ip_address=request.client.host,
+        created_at=now
+    )
     db.add(log)
 
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Eroare la salvarea sesiunii.")
 
     return {
         "access_token": access_token,

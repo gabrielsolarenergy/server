@@ -10,6 +10,9 @@ import qrcode
 import io
 import base64
 
+import random
+import string
+
 from backend.app.core.config import settings
 from backend.app.models.database import get_db, User
 
@@ -136,3 +139,8 @@ def generate_2fa_qr(email: str, secret: str) -> str:
 def verify_2fa_code(secret: str, code: str) -> bool:
     totp = pyotp.TOTP(secret)
     return totp.verify(code, valid_window=1)
+
+
+def generate_verification_code() -> str:
+    """Generează un cod de 6 cifre"""
+    return ''.join(random.choices(string.digits, k=6))

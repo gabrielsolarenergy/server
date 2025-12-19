@@ -48,7 +48,7 @@ class User(Base):
     last_login = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
+    verification_code_hash = Column(String, nullable=True)
     # RELATIONSHIPS - CORECTATE
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
 

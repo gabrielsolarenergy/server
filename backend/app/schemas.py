@@ -118,3 +118,7 @@ class BlogPostOut(BlogPostCreate):
 
     class Config:
         from_attributes = True
+
+class EmailVerification(BaseModel):
+    email: EmailStr
+    code: str
