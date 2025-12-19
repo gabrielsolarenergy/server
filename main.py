@@ -37,6 +37,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:8081",
                    "gabriel-solar-energy.ro",
+                   "http://gabriel-solar-energy.ro",
                    "https://gabriel-solar-energy.ro/",
                    "https://sparkling-sunburst-33a9b7.netlify.app"
                    ],
