@@ -35,7 +35,9 @@ app = FastAPI(
 # În backend/app/main.py
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8081"],
+    allow_origins=["http://localhost:8081",
+                   "gabriel-solar-energy.ro",
+                   "https://gabriel-solar-energy.ro/"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
