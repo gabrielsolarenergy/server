@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.security import require_role
 from backend.app.models.database import get_db, User, ContactLead, Project, BlogPost, AuditLog
-from backend.app.schemas import UserOut, ContactLeadOut, ProjectOut
+from backend.app.schemas import UserOut, UserStatusUpdate  # Asigură-te că importi UserStatusUpdate
+from backend.app.schemas import ContactLeadOut, ProjectOut
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
 
@@ -14,9 +15,43 @@ admin_dependency = Depends(require_role(["admin"]))
 
 
 # --- GESTIONARE UTILIZATORI ---
+
 @router.get("/users", response_model=List[UserOut], dependencies=[admin_dependency])
 async def list_users(db: Session = Depends(get_db)):
     return db.query(User).all()
+
+
+@router.patch("/users/{user_id}/status", dependencies=[admin_dependency])
+async def update_user_status(
+        user_id: UUID,
+        status_data: UserStatusUpdate,
+        db: Session = Depends(get_db)
+):
+    """
+    Endpoint protejat: Permite doar administratorilor să schimbe statusul de verificare al unui user.
+    """
+    # 1. Căutăm utilizatorul în baza de date
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilizatorul nu a fost găsit.")
+
+    # 2. Actualizăm câmpul conform datelor trimise din Frontend
+    user.is_verified = status_data.is_verified
+
+    # 3. Salvăm modificările în Postgres
+    try:
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Eroare la actualizarea bazei de date.")
+
+    return {
+        "message": f"Statusul utilizatorului {user.email} a fost actualizat cu succes.",
+        "user_id": user.id,
+        "is_verified": user.is_verified
+    }
 
 
 @router.patch("/users/{user_id}/role", dependencies=[admin_dependency])

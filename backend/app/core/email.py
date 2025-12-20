@@ -19,7 +19,7 @@ EMAIL_TEMPLATES = {
             <tr>
                 <td align="center" style="padding: 40px 20px; background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%);">
                     <h1 style="color: #ffffff; margin: 0; font-size: 28px; letter-spacing: 1px;">GABRIEL SOLAR</h1>
-                    <p style="color: #e8f5e9; margin: 5px 0 0 0; font-size: 14px; text-transform: uppercase;">Energie curată pentru viitor</p>
+                    <p style="color: #1C4C27; margin: 5px 0 0 0; font-size: 14px; text-transform: uppercase;">Energie curată pentru viitor</p>
                 </td>
             </tr>
             <tr>

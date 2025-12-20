@@ -7,14 +7,23 @@ import re
 # --- USER SCHEMAS ---
 
 class UserBase(BaseModel):
-    email: EmailStr
-    first_name: str
-    last_name: str
-    phone_number: Optional[str] = None
-    location: Optional[str] = None
+    email: EmailStr = Field(...)
+
+    first_name: str = Field(..., min_length=2, max_length=50)
+    last_name: str = Field(..., min_length=2, max_length=50)
+
+    phone_number: str = Field(..., pattern=r'^\+?4?07[0-9]{8}$')
+    location: str = Field(..., min_length=3, max_length=100)
+
+    @validator('first_name', 'last_name')
+    def name_must_not_contain_numbers(cls, v):
+        if any(char.isdigit() for char in v):
+            raise ValueError('Numele nu poate conține cifre.')
+        return v.strip().title()
+
 
 class UserCreate(UserBase):
-    password: str = Field(min_length=8, max_length=100)
+    password: str = Field(..., min_length=8, max_length=100)
 
     @validator('password')
     def validate_password(cls, v):
@@ -26,10 +35,12 @@ class UserCreate(UserBase):
             raise ValueError('Parola trebuie să conțină cel puțin o cifră.')
         return v
 
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
     totp_code: Optional[str] = None
+
 
 class UserOut(UserBase):
     id: UUID
@@ -62,14 +73,16 @@ class PasswordReset(BaseModel):
     new_password: str = Field(min_length=8)
 
 # --- CONTACT & LEAD SCHEMAS ---
+class UserStatusUpdate(BaseModel):
+    is_verified: bool
 
 class ContactLeadCreate(BaseModel):
-    full_name: str
+    full_name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
-    phone: str
-    property_type: str
-    interest: str
-    message: Optional[str] = None
+    phone: str = Field(..., pattern=r"^\+?4?07[0-9]{8}$")
+    property_type: str = Field(..., min_length=3)
+    interest: str = Field(..., min_length=3)
+    message: Optional[str] = Field(None, max_length=1000)
 
 class ContactLeadOut(ContactLeadCreate):
     id: UUID
