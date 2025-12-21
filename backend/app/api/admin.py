@@ -176,18 +176,16 @@ async def delete_project(project_id: UUID, db: Session = Depends(get_db)):
     return {"message": "Proiect șters definitiv"}
 
 
-@router.get("/all", response_model=List[ServiceRequestOut])
-def get_all_requests_admin(db: Session = Depends(get_db), _=Depends(admin_dependency)):
+@router.get("/all", response_model=List[ServiceRequestOut], dependencies=[admin_dependency])
+def get_all_requests_admin(db: Session = Depends(get_db)):
     return db.query(ServiceRequest).order_by(ServiceRequest.created_at.desc()).all()
 
 
-@router.patch("/{request_id}/respond")
+@router.patch("/{request_id}/respond",  dependencies=[admin_dependency])
 def respond_to_request(
         request_id: str,
         data: ServiceRequestUpdate,
-        db: Session = Depends(get_db),
-        _=Depends(admin_dependency)
-):
+        db: Session = Depends(get_db)):
     req = db.query(ServiceRequest).filter(ServiceRequest.id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
