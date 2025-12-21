@@ -95,7 +95,8 @@ app.include_router(chat.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(
     service_requests.router,
-    prefix=settings.API_V1_PREFIX
+    prefix=f"{settings.API_V1_PREFIX}/service-requests",
+    tags=["Requests"]
 )
 
 # ============================================

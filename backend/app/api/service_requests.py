@@ -9,7 +9,7 @@ from backend.app.models.database import get_db, ServiceRequest
 from backend.app.schemas import ServiceRequestOut
 from backend.app.utils.storage import upload_image_to_bucket
 
-router = APIRouter(prefix="/service-requests", tags=["Requests"])
+router = APIRouter(prefix="", tags=["Requests"])
 
 
 @router.post("/", response_model=ServiceRequestOut)
@@ -97,3 +97,4 @@ def accept_reschedule(
 
     db.commit()
     return {"message": "Data a fost actualizată cu succes"}
+
