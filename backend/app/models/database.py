@@ -62,7 +62,7 @@ class User(Base):
 
     blog_posts = relationship("BlogPost", back_populates="author")
     chat_messages = relationship("ChatMessage", back_populates="user")
-
+    service_requests = relationship("ServiceRequest", back_populates="user", cascade="all, delete-orphan")
 class UserSession(Base):
     __tablename__ = "user_sessions"
 
