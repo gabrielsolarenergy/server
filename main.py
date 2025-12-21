@@ -46,10 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(
-    service_requests.router,
-    prefix="/api/v1/service-requests"
-)
+
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     start_time = time.time()
@@ -96,7 +93,10 @@ app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(solar.router, prefix=settings.API_V1_PREFIX)
 app.include_router(chat.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
-
+app.include_router(
+    service_requests.router,
+    prefix=settings.API_V1_PREFIX
+)
 
 # ============================================
 # HEALTH CHECK & ROOT
