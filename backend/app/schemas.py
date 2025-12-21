@@ -146,3 +146,33 @@ class UserUpdateSchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ServiceRequestCreate(BaseModel):
+    type: str
+    preferred_date: datetime
+    preferred_time: str
+    location: str
+    phone: str
+    description: Optional[str] = None
+    photos: Optional[List[str]] = []
+
+class ServiceRequestUpdate(BaseModel):
+    status: Optional[str] = None
+    admin_response: Optional[str] = None
+    new_proposed_date: Optional[datetime] = None
+
+class ServiceRequestOut(BaseModel):
+    id: str
+    type: str
+    preferred_date: datetime
+    preferred_time: str
+    location: str
+    phone: str
+    description: Optional[str]
+    status: str
+    admin_response: Optional[str]
+    new_proposed_date: Optional[datetime]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

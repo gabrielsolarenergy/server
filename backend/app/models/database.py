@@ -141,6 +141,25 @@ class Project(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class ServiceRequest(Base):
+    __tablename__ = "service_requests"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    type = Column(String, nullable=False) # consultatie, oferta, instalare, mentenanta, reparatie
+    preferred_date = Column(DateTime, nullable=False)
+    preferred_time = Column(String, nullable=False)
+    location = Column(String, nullable=False)
+    phone = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    photos = Column(JSON, default=[]) # Stocăm listă de URL-uri
+    status = Column(String, default="pending") # pending, accepted, rescheduled, completed, cancelled
+    admin_response = Column(Text, nullable=True)
+    new_proposed_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="service_requests")
+
 class BlogPost(Base):
     __tablename__ = "blog_posts"
 

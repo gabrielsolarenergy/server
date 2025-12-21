@@ -5,8 +5,9 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from backend.app.core.security import require_role
-from backend.app.models.database import get_db, User, ContactLead, Project, BlogPost, AuditLog
-from backend.app.schemas import UserOut, UserStatusUpdate, UserUpdateSchema  # Asigură-te că importi UserStatusUpdate
+from backend.app.models.database import get_db, User, ContactLead, Project, BlogPost, AuditLog, ServiceRequest
+from backend.app.schemas import UserOut, UserStatusUpdate, UserUpdateSchema, \
+    ServiceRequestOut, ServiceRequestUpdate  # Asigură-te că importi UserStatusUpdate
 from backend.app.schemas import ContactLeadOut, ProjectOut
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
@@ -173,3 +174,26 @@ async def delete_project(project_id: UUID, db: Session = Depends(get_db)):
     db.delete(project)
     db.commit()
     return {"message": "Proiect șters definitiv"}
+
+
+@router.get("/all", response_model=List[ServiceRequestOut])
+def get_all_requests_admin(db: Session = Depends(get_db), _=Depends(admin_dependency)):
+    return db.query(ServiceRequest).order_by(ServiceRequest.created_at.desc()).all()
+
+
+@router.patch("/{request_id}/respond")
+def respond_to_request(
+        request_id: str,
+        data: ServiceRequestUpdate,
+        db: Session = Depends(get_db),
+        _=Depends(admin_dependency)
+):
+    req = db.query(ServiceRequest).filter(ServiceRequest.id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    for key, value in data.dict(exclude_unset=True).items():
+        setattr(req, key, value)
+
+    db.commit()
+    return {"message": "Request updated"}
