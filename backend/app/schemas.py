@@ -135,3 +135,14 @@ class BlogPostOut(BlogPostCreate):
 class EmailVerification(BaseModel):
     email: EmailStr
     code: str
+
+class UserUpdateSchema(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[str] = None
+    phone_number: Optional[str] = None
+    location: Optional[str] = None
+
+    class Config:
+        from_attributes = True

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.security import require_role
 from backend.app.models.database import get_db, User, ContactLead, Project, BlogPost, AuditLog
-from backend.app.schemas import UserOut, UserStatusUpdate  # Asigură-te că importi UserStatusUpdate
+from backend.app.schemas import UserOut, UserStatusUpdate, UserUpdateSchema  # Asigură-te că importi UserStatusUpdate
 from backend.app.schemas import ContactLeadOut, ProjectOut
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
@@ -127,6 +127,25 @@ async def delete_lead(lead_id: str, db: Session = Depends(get_db)):
     db.delete(lead)
     db.commit()
     return {"message": "Lead șters cu succes"}
+
+
+@router.patch("/users/{user_id}", dependencies=[admin_dependency])
+async def update_user(
+        user_id: str,
+        user_data: UserUpdateSchema,
+        db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilizatorul nu a fost găsit")
+
+    # Update fields
+    update_dict = user_data.dict(exclude_unset=True)
+    for key, value in update_dict.items():
+        setattr(user, key, value)
+
+    db.commit()
+    return {"message": "Utilizator actualizat cu succes"}
 
 @router.patch("/leads/{lead_id}/status", dependencies=[admin_dependency])
 async def update_lead_status(lead_id: UUID, status: str, db: Session = Depends(get_db)):
