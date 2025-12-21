@@ -11,7 +11,7 @@ from backend.app.core.config import settings
 from backend.app.core.rate_limit import rate_limit_dependency
 from backend.app.models.database import Base, engine, get_db
 from backend.app.api import auth, solar, chat, admin
-
+from backend.app.api import service_requests # Importă fișierul nou creat
 # Configurare Logging pentru monitorizarea erorilor în producție
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+app.include_router(service_requests.router, prefix="/api/v1/service-requests", tags=["Requests"])
 # 2. Performance & Logging Middleware: Calculează timpul de execuție al fiecărui request
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
