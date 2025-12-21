@@ -1,6 +1,7 @@
 from typing import List
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from backend.app.core.security import require_role
@@ -69,10 +70,52 @@ async def change_user_role(user_id: UUID, new_role: str, db: Session = Depends(g
 
 
 # --- MANAGEMENT LEADS (CRM) ---
-@router.get("/leads", response_model=List[ContactLeadOut], dependencies=[admin_dependency])
-async def get_all_leads(db: Session = Depends(get_db)):
-    return db.query(ContactLead).order_by(ContactLead.created_at.desc()).all()
+@router.get("/leads", dependencies=[admin_dependency])
+async def get_all_leads(
+    db: Session = Depends(get_db),
+    page: int = Query(1, ge=1),
+    size: int = Query(6, ge=1, le=100),
+    search: str = Query(None),
+    status: str = Query(None),
+    property_type: str = Query(None)
+):
+    query = db.query(ContactLead)
 
+    # Aplicăm filtrul de căutare (Nume, Email sau Telefon)
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            or_(
+                ContactLead.full_name.ilike(search_filter),
+                ContactLead.email.ilike(search_filter),
+                ContactLead.phone.ilike(search_filter)
+            )
+        )
+
+    # Aplicăm filtrul de status
+    if status and status != "all":
+        query = query.filter(ContactLead.status == status)
+
+    # Aplicăm filtrul de tip proprietate
+    if property_type and property_type != "all":
+        query = query.filter(ContactLead.property_type == property_type)
+
+    # Calculăm totalul după filtrare, dar înainte de paginare
+    total_items = query.count()
+    total_pages = (total_items + size - 1) // size if total_items > 0 else 1
+
+    # Paginare
+    leads = query.order_by(ContactLead.created_at.desc())\
+                 .offset((page - 1) * size)\
+                 .limit(size)\
+                 .all()
+
+    return {
+        "items": leads,
+        "total_pages": total_pages,
+        "current_page": page,
+        "total_items": total_items
+    }
 
 @router.patch("/leads/{lead_id}/status", dependencies=[admin_dependency])
 async def update_lead_status(lead_id: UUID, status: str, db: Session = Depends(get_db)):
