@@ -117,6 +117,17 @@ async def get_all_leads(
         "total_items": total_items
     }
 
+
+@router.delete("/leads/{lead_id}", dependencies=[admin_dependency])
+async def delete_lead(lead_id: str, db: Session = Depends(get_db)):
+    lead = db.query(ContactLead).filter(ContactLead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead-ul nu a fost găsit")
+
+    db.delete(lead)
+    db.commit()
+    return {"message": "Lead șters cu succes"}
+
 @router.patch("/leads/{lead_id}/status", dependencies=[admin_dependency])
 async def update_lead_status(lead_id: UUID, status: str, db: Session = Depends(get_db)):
     lead = db.query(ContactLead).filter(ContactLead.id == lead_id).first()
