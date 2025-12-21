@@ -144,20 +144,25 @@ class Project(Base):
 class ServiceRequest(Base):
     __tablename__ = "service_requests"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    type = Column(String, nullable=False) # consultatie, oferta, instalare, mentenanta, reparatie
+    # Folosește UUID pentru ID-ul primar, la fel ca restul tabelelor
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # MODIFICARE CRUCIALĂ: user_id trebuie să fie UUID pentru a se potrivi cu users.id
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    type = Column(String, nullable=False)  # consultatie, oferta, instalare, mentenanta, reparatie
     preferred_date = Column(DateTime, nullable=False)
     preferred_time = Column(String, nullable=False)
     location = Column(String, nullable=False)
     phone = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    photos = Column(JSON, default=[]) # Stocăm listă de URL-uri
-    status = Column(String, default="pending") # pending, accepted, rescheduled, completed, cancelled
+    photos = Column(JSON, default=list)  # Folosește list (funcție) pentru default JSON
+    status = Column(String, default="pending")
     admin_response = Column(Text, nullable=True)
     new_proposed_date = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Relația către utilizator
     user = relationship("User", back_populates="service_requests")
 
 class BlogPost(Base):
