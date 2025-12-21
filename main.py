@@ -46,8 +46,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(service_requests.router, prefix="/api/v1/service-requests", tags=["Requests"])
-# 2. Performance & Logging Middleware: Calculează timpul de execuție al fiecărui request
+app.include_router(
+    service_requests.router,
+    prefix="/api/v1/service-requests"
+)
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     start_time = time.time()

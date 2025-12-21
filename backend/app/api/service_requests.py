@@ -6,7 +6,7 @@ from backend.app.core.security import get_current_user
 from backend.app.models.database import get_db, ServiceRequest
 from backend.app.schemas import ServiceRequestOut, ServiceRequestCreate
 
-router = APIRouter(prefix="/service-requests", tags=["Requests"])
+router = APIRouter(prefix="", tags=["Requests"])
 
 
 @router.post("/", response_model=ServiceRequestOut)
