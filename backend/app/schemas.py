@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, validator, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -162,17 +162,18 @@ class ServiceRequestUpdate(BaseModel):
     new_proposed_date: Optional[datetime] = None
 
 class ServiceRequestOut(BaseModel):
-    id: str
+    id: UUID  # Modifică din str în UUID
+    user_id: UUID
     type: str
     preferred_date: datetime
     preferred_time: str
     location: str
     phone: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: str
-    admin_response: Optional[str]
-    new_proposed_date: Optional[datetime]
+    admin_response: Optional[str] = None
+    new_proposed_date: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    # Pentru Pydantic v2, folosește ConfigDict pentru a permite citirea din modele SQLAlchemy
+    model_config = ConfigDict(from_attributes=True)
