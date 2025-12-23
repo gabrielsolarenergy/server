@@ -269,17 +269,27 @@ def get_all_requests_admin(
         "current_page": page
     }
 
-@router.patch("/{request_id}/respond",  dependencies=[admin_dependency])
+
+# Modifică în backend/app/api/admin.py
+@router.patch("/{request_id}/respond", dependencies=[admin_dependency])
 def respond_to_request(
-        request_id: str,
+        request_id: UUID,  # Schimbă din str în UUID
         data: ServiceRequestUpdate,
         db: Session = Depends(get_db)):
     req = db.query(ServiceRequest).filter(ServiceRequest.id == request_id).first()
     if not req:
-        raise HTTPException(status_code=404, detail="Request not found")
+        raise HTTPException(status_code=404, detail="Cererea nu a fost găsită")
 
-    for key, value in data.dict(exclude_unset=True).items():
+    # Actualizăm câmpurile trimise (status, admin_response, new_proposed_date)
+    update_data = data.dict(exclude_unset=True)
+    for key, value in update_data.items():
         setattr(req, key, value)
 
-    db.commit()
-    return {"message": "Request updated"}
+    try:
+        db.commit()
+        db.refresh(req)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Eroare la salvarea răspunsului")
+
+    return {"message": "Răspuns înregistrat cu succes", "status": req.status}
