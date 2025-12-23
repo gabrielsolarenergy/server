@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from backend.app.core.security import require_role
 from backend.app.models.database import get_db, User, ContactLead, Project, BlogPost, AuditLog, ServiceRequest
 from backend.app.schemas import UserOut, UserStatusUpdate, UserUpdateSchema, \
-    ServiceRequestOut, ServiceRequestUpdate  # Asigură-te că importi UserStatusUpdate
+    ServiceRequestOut, ServiceRequestUpdate, ContactLeadCreate  # Asigură-te că importi UserStatusUpdate
 from backend.app.schemas import ContactLeadOut, ProjectOut
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
@@ -158,6 +158,61 @@ async def update_lead_status(lead_id: UUID, status: str, db: Session = Depends(g
     db.commit()
     return {"message": "Status lead actualizat"}
 
+# --- ADAUGĂ ACEASTA ÎN BACKEND (fișierul cu rutele de admin) ---
+
+@router.post("/leads", response_model=ContactLeadOut, dependencies=[admin_dependency])
+async def create_lead(
+        lead_data: ContactLeadCreate,
+        db: Session = Depends(get_db)
+):
+    """
+    Creează un lead nou manual din panoul de admin.
+    """
+    new_lead = ContactLead(
+        full_name=lead_data.full_name,
+        email=lead_data.email,
+        phone=lead_data.phone,
+        property_type=lead_data.property_type,
+        interest=lead_data.interest,
+        message=lead_data.message,
+        status="nou",  # Default status
+        source="Admin Panel"
+    )
+
+    try:
+        db.add(new_lead)
+        db.commit()
+        db.refresh(new_lead)
+        return new_lead
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Eroare la salvarea lead-ului în baza de date.")
+
+@router.patch("/leads/{lead_id}", response_model=ContactLeadOut, dependencies=[admin_dependency])
+async def update_lead_details(
+    lead_id: UUID,
+    lead_data: dict, # Folosim dict pentru a permite update parțial (nume, email, etc.)
+    db: Session = Depends(get_db)
+):
+    """
+    Actualizează detaliile generale ale unui lead.
+    """
+    lead = db.query(ContactLead).filter(ContactLead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead-ul nu a fost găsit.")
+
+    # Actualizăm câmpurile care există în baza de date și sunt trimise din front-end
+    for key, value in lead_data.items():
+        if hasattr(lead, key):
+            setattr(lead, key, value)
+
+    try:
+        db.commit()
+        db.refresh(lead)
+        return lead
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Eroare la actualizarea lead-ului.")
 
 # --- AUDIT LOGS (Monitorizare activitate) ---
 @router.get("/audit-logs", dependencies=[admin_dependency])
