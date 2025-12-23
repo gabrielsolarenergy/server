@@ -2,12 +2,13 @@ from typing import List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from backend.app.core.security import require_role
 from backend.app.models.database import get_db, User, ContactLead, Project, BlogPost, AuditLog, ServiceRequest
 from backend.app.schemas import UserOut, UserStatusUpdate, UserUpdateSchema, \
-    ServiceRequestOut, ServiceRequestUpdate, ContactLeadCreate  # Asigură-te că importi UserStatusUpdate
+    ServiceRequestOut, ServiceRequestUpdate, ContactLeadCreate, \
+    ServiceRequestsPagination  # Asigură-te că importi UserStatusUpdate
 from backend.app.schemas import ContactLeadOut, ProjectOut
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
