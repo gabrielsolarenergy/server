@@ -161,9 +161,13 @@ class ServiceRequestUpdate(BaseModel):
     admin_response: Optional[str] = None
     new_proposed_date: Optional[datetime] = None
 
+# În backend/app/schemas.py
+
 class ServiceRequestOut(BaseModel):
-    id: UUID  # Modifică din str în UUID
+    id: UUID
     user_id: UUID
+    # Adaugă acest câmp pentru a popula "Client" și "Email" în interfață
+    user: Optional[UserOut] = None
     type: str
     preferred_date: datetime
     preferred_time: str
@@ -175,5 +179,11 @@ class ServiceRequestOut(BaseModel):
     new_proposed_date: Optional[datetime] = None
     created_at: datetime
 
-    # Pentru Pydantic v2, folosește ConfigDict pentru a permite citirea din modele SQLAlchemy
     model_config = ConfigDict(from_attributes=True)
+
+# În backend/app/schemas.py
+class ServiceRequestsPagination(BaseModel):
+    items: List[ServiceRequestOut]
+    total_count: int
+    total_pages: int
+    current_page: int

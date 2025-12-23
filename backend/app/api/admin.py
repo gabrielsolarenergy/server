@@ -231,10 +231,42 @@ async def delete_project(project_id: UUID, db: Session = Depends(get_db)):
     return {"message": "Proiect șters definitiv"}
 
 
-@router.get("/all", response_model=List[ServiceRequestOut], dependencies=[admin_dependency])
-def get_all_requests_admin(db: Session = Depends(get_db)):
-    return db.query(ServiceRequest).order_by(ServiceRequest.created_at.desc()).all()
+@router.get("/all", response_model=ServiceRequestsPagination, dependencies=[admin_dependency])
+def get_all_requests_admin(
+        service_type: str = Query(None),
+        status: str = Query(None),
+        page: int = Query(1, ge=1),
+        size: int = Query(10, ge=1, le=100),
+        db: Session = Depends(get_db)
+):
+    # 1. Query-ul de bază cu JOIN pentru user
+    query = db.query(ServiceRequest).options(joinedload(ServiceRequest.user))
 
+    # 2. Aplicăm filtrele
+    if service_type and service_type != "all":
+        query = query.filter(ServiceRequest.type == service_type)
+
+    if status and status != "all":
+        query = query.filter(ServiceRequest.status == status)
+
+    # 3. Calculăm totalul înainte de paginare
+    total_count = query.count()
+    total_pages = (total_count + size - 1) // size if total_count > 0 else 1
+
+    # 4. Aplicăm ordonarea și limitele de paginare
+    # offset = numărul de elemente peste care sărim
+    # limit = câte elemente luăm
+    items = query.order_by(ServiceRequest.created_at.desc()) \
+        .offset((page - 1) * size) \
+        .limit(size) \
+        .all()
+
+    return {
+        "items": items,
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "current_page": page
+    }
 
 @router.patch("/{request_id}/respond",  dependencies=[admin_dependency])
 def respond_to_request(
