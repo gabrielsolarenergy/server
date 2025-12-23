@@ -144,25 +144,36 @@ class Project(Base):
 class ServiceRequest(Base):
     __tablename__ = "service_requests"
 
-    # Folosește UUID pentru ID-ul primar, la fel ca restul tabelelor
+    # Identificator unic (UUID)
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    # MODIFICARE CRUCIALĂ: user_id trebuie să fie UUID pentru a se potrivi cu users.id
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # REPARAȚIE EROARE 500: user_id devine nullable=True pentru a permite programări manuale
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
 
+    # Detalii Serviciu
     type = Column(String, nullable=False)  # consultatie, oferta, instalare, mentenanta, reparatie
     preferred_date = Column(DateTime, nullable=False)
     preferred_time = Column(String, nullable=False)
     location = Column(String, nullable=False)
     phone = Column(String, nullable=False)
+
+    # Câmp nou pentru a stoca numele scris de mână în calendar (repară "Utilizator necunoscut")
+    full_name = Column(String(100), nullable=True)
+    # Câmp pentru email (folosit când clientul nu are cont în sistem)
+    email = Column(String(100), nullable=True)
+
     description = Column(Text, nullable=True)
-    photos = Column(JSON, default=list)  # Folosește list (funcție) pentru default JSON
+    photos = Column(JSON, default=list)
+
+    # Status și Răspuns Admin
     status = Column(String, default="pending")
     admin_response = Column(Text, nullable=True)
     new_proposed_date = Column(DateTime, nullable=True)
+
+    # Audit
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # Relația către utilizator
+    # Relația către utilizator (va fi None pentru intervențiile manuale)
     user = relationship("User", back_populates="service_requests")
 
 class BlogPost(Base):

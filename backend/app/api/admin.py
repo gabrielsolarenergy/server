@@ -299,40 +299,31 @@ def respond_to_request(
 
 @router.post("/calendar-events", dependencies=[admin_dependency])
 async def create_calendar_event(
-        event_data: dict,  # Poți folosi un Schema Pydantic dedicat dacă preferi
-        db: Session = Depends(get_db)
+    event_data: dict,
+    db: Session = Depends(get_db)
 ):
-    """
-    Creează o programare manuală direct în tabela ServiceRequests
-    pentru a apărea în calendar.
-    """
     try:
-        # Combinăm data și ora primite din frontend într-un obiect datetime
-        # Frontend-ul trimite 'date' (YYYY-MM-DD) și 'startTime' (HH:MM)
         from datetime import datetime
+        # Combinăm data și ora
         combined_str = f"{event_data['date']} {event_data['startTime']}"
         preferred_dt = datetime.strptime(combined_str, "%Y-%m-%d %H:%M")
 
         new_event = ServiceRequest(
+            user_id=None,  # Fiind manual, nu avem user_id (de aici era eroarea 500)
             type=event_data.get("type", "Intervenție Manuală"),
             preferred_date=preferred_dt,
             preferred_time=event_data.get("startTime"),
             location=event_data.get("location"),
             phone=event_data.get("phone"),
-            description=event_data.get("description"),
-            status="accepted",  # O marcăm direct ca acceptată pentru a apărea în calendar
-            admin_response="Programare manuală creată de administrator.",
-            # full_name poate fi stocat în description sau poți adăuga coloana în model
+            description=f"CLIENT: {event_data.get('title')} | {event_data.get('description')}",
+            status="accepted",  # O punem direct acceptată să apară în calendar
+            created_at=datetime.utcnow()
         )
 
         db.add(new_event)
         db.commit()
         db.refresh(new_event)
-        return {"message": "Eveniment creat cu succes", "id": new_event.id}
-
+        return {"message": "Succes", "id": str(new_event.id)}
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Eroare la salvarea în baza de date: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Eroare baza de date: {str(e)}")
