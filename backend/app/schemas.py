@@ -165,8 +165,8 @@ class ServiceRequestUpdate(BaseModel):
 
 class ServiceRequestOut(BaseModel):
     id: UUID
-    user_id: UUID
-    # Adaugă acest câmp pentru a popula "Client" și "Email" în interfață
+    # MODIFICĂ AICI: Adaugă Optional sau | None
+    user_id: Optional[UUID] = None
     user: Optional[UserOut] = None
     type: str
     preferred_date: datetime
