@@ -421,3 +421,36 @@ async def create_blog_post(
         db.rollback()
         print(f"Eroare detaliată Blog: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/blog/{post_id}", dependencies=[admin_dependency])
+async def delete_blog_post(
+        post_id: UUID,
+        db: Session = Depends(get_db)
+):
+    """
+    Șterge definitiv un articol de blog din baza de date.
+    """
+    # 1. Căutăm articolul
+    post = db.query(BlogPost).filter(BlogPost.id == post_id).first()
+
+    # 2. Dacă nu există, dăm eroare 404
+    if not post:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Articolul de blog nu a fost găsit."
+        )
+
+    try:
+        # 3. Ștergem articolul
+        db.delete(post)
+        db.commit()
+        return {"message": "Articolul a fost șters cu succes."}
+
+    except Exception as e:
+        db.rollback()
+        print(f"Eroare la ștergere blog: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Eroare internă la ștergere: {str(e)}"
+        )
