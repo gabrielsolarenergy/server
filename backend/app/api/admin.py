@@ -382,30 +382,27 @@ async def create_project(
 def generate_slug(title: str) -> str:
     return re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')
 
+
 @router.post("/blog", dependencies=[admin_dependency])
 async def create_blog_post(
         title: str = Form(...),
         content: str = Form(...),
+        category: str = Form(...),
         excerpt: str = Form(None),
-        category: str = Form(None),
         tags: str = Form(None),
-        is_published: str = Form("false"),  # Primim string pentru siguranță
+        is_published: str = Form("false"),  # Primit ca string de la FormData
         seo_title: str = Form(None),
         seo_description: str = Form(None),
-        image: UploadFile = File(...),
+        image: UploadFile = File(...),  # Numele cheii trebuie să fie 'image'
         db: Session = Depends(get_db)
 ):
     try:
-        # 1. Upload imagine
-        image_url = await upload_image_to_bucket(image)
-
-        # 2. Procesare tag-uri
-        tags_list = [t.strip() for t in tags.split(",")] if tags else []
-
-        # 3. Conversie manuală Boolean (pentru a evita 422)
+        # Conversie manuală din string în bool
         published_bool = is_published.lower() == "true"
 
-        # 4. Creare postare
+        image_url = await upload_image_to_bucket(image)
+        tags_list = [t.strip() for t in tags.split(",")] if tags else []
+
         new_post = BlogPost(
             title=title,
             slug=generate_slug(title),
@@ -415,21 +412,12 @@ async def create_blog_post(
             tags=tags_list,
             featured_image=image_url,
             is_published=published_bool,
-            published_at=datetime.utcnow() if published_bool else None,
-            seo_title=seo_title,
-            seo_description=seo_description
+            published_at=datetime.utcnow() if published_bool else None
         )
-
         db.add(new_post)
         db.commit()
         db.refresh(new_post)
         return new_post
-
     except Exception as e:
         db.rollback()
-        # Loghează eroarea în consolă pentru debug
-        print(f"Eroare detaliată: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Eroare la crearea postării: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
