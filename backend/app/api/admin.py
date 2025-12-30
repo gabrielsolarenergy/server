@@ -1,5 +1,6 @@
+import re
 from datetime import datetime
-from typing import List, re
+from typing import List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Form, UploadFile, File
 from sqlalchemy import or_
