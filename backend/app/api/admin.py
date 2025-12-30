@@ -444,3 +444,40 @@ async def delete_blog_post(
             status_code=500,
             detail=f"Eroare internă la ștergere: {str(e)}"
         )
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectOut, dependencies=[admin_dependency])
+async def update_project(
+        project_id: UUID,
+        project_data: dict,  # Primim un dicționar pentru a permite update parțial
+        db: Session = Depends(get_db)
+):
+    """
+    Actualizează detaliile unui proiect existent.
+    """
+    # 1. Căutăm proiectul în bază
+    project = db.query(Project).filter(Project.id == project_id).first()
+
+    if not project:
+        raise HTTPException(
+            status_code=404,
+            detail="Proiectul nu a fost găsit."
+        )
+
+    # 2. Mapăm și actualizăm câmpurile trimise din frontend
+    # Folosim setattr pentru a actualiza dinamic doar ce a fost trimis
+    for key, value in project_data.items():
+        if hasattr(project, key):
+            setattr(project, key, value)
+
+    try:
+        db.commit()
+        db.refresh(project)
+        return project
+    except Exception as e:
+        db.rollback()
+        print(f"Eroare la update proiect: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Eroare la salvarea modificărilor: {str(e)}"
+        )
