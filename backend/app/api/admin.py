@@ -1,6 +1,7 @@
-from typing import List
+from datetime import datetime
+from typing import List, re
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Form, UploadFile, File
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -10,6 +11,7 @@ from backend.app.schemas import UserOut, UserStatusUpdate, UserUpdateSchema, \
     ServiceRequestOut, ServiceRequestUpdate, ContactLeadCreate, \
     ServiceRequestsPagination  # Asigură-te că importi UserStatusUpdate
 from backend.app.schemas import ContactLeadOut, ProjectOut
+from backend.app.utils.storage import upload_image_to_bucket
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
 
@@ -327,3 +329,101 @@ async def create_calendar_event(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Eroare baza de date: {str(e)}")
+
+
+@router.post("/projects", response_model=ProjectOut, dependencies=[admin_dependency])
+async def create_project(
+        title: str = Form(...),
+        description: str = Form(None),
+        location: str = Form(...),
+        category: str = Form(...),
+        capacity_kw: float = Form(...),
+        panels_count: int = Form(None),
+        investment_value: float = Form(None),
+        status: str = Form("completed"),
+        is_featured: bool = Form(False),
+        image: UploadFile = File(...),  # Fișierul imagine obligatoriu
+        db: Session = Depends(get_db)
+):
+    try:
+        # 1. Upload imagine în S3 și obținere URL
+        image_url = await upload_image_to_bucket(image)
+
+        # 2. Creare obiect Proiect
+        new_project = Project(
+            title=title,
+            description=description,
+            location=location,
+            category=category,
+            capacity_kw=capacity_kw,
+            panels_count=panels_count,
+            investment_value=investment_value,
+            status=status,
+            is_featured=is_featured,
+            image_url=image_url
+        )
+
+        db.add(new_project)
+        db.commit()
+        db.refresh(new_project)
+        return new_project
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Eroare la crearea proiectului: {str(e)}"
+        )
+
+
+def generate_slug(title: str) -> str:
+    # Transformă "Titlu Articol!" în "titlu-articol"
+    return re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')
+
+
+@router.post("/blog", dependencies=[admin_dependency])
+async def create_blog_post(
+        title: str = Form(...),
+        content: str = Form(...),
+        excerpt: str = Form(None),
+        category: str = Form(None),
+        tags: str = Form(None),  # Trimis ca string separat prin virgulă
+        is_published: bool = Form(False),
+        seo_title: str = Form(None),
+        seo_description: str = Form(None),
+        image: UploadFile = File(...),
+        db: Session = Depends(get_db)
+):
+    try:
+        # 1. Upload imagine
+        image_url = await upload_image_to_bucket(image)
+
+        # 2. Procesare tag-uri din string în listă (JSON)
+        tags_list = [t.strip() for t in tags.split(",")] if tags else []
+
+        # 3. Creare postare
+        new_post = BlogPost(
+            title=title,
+            slug=generate_slug(title),
+            content=content,
+            excerpt=excerpt,
+            category=category,
+            tags=tags_list,
+            featured_image=image_url,
+            is_published=is_published,
+            published_at=datetime.utcnow() if is_published else None,
+            seo_title=seo_title,
+            seo_description=seo_description
+        )
+
+        db.add(new_post)
+        db.commit()
+        db.refresh(new_post)
+        return new_post
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Eroare la crearea postării: {str(e)}"
+        )
