@@ -481,3 +481,22 @@ async def update_project(
             status_code=500,
             detail=f"Eroare la salvarea modificărilor: {str(e)}"
         )
+@router.patch("/blog/{post_id}", dependencies=[admin_dependency])
+async def update_blog_post(
+    post_id: UUID,
+    post_data: dict,
+    db: Session = Depends(get_db)
+):
+    post = db.query(BlogPost).filter(BlogPost.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Articolul nu a fost găsit.")
+
+    for key, value in post_data.items():
+        if hasattr(post, key):
+            if key == "is_published" and isinstance(value, str):
+                value = value.lower() == "true"
+            setattr(post, key, value)
+
+    db.commit()
+    db.refresh(post)
+    return post
