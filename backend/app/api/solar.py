@@ -77,3 +77,25 @@ async def submit_contact(data: ContactLeadCreate, bg_tasks: BackgroundTasks, db:
     bg_tasks.add_task(send_email, to_email=settings.SMTP_USER, subject="🚀 Lead Nou - Gabriel Solar",
                       template_name="contact_notification", context=data.dict())
     return {"message": "Solicitarea a fost primită!"}
+@router.get("/blog", response_model=List[BlogPostOut]) # Sau un model de paginare dacă preferi
+async def get_blog_posts(
+    category: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    size: int = Query(6, ge=1),
+    db: Session = Depends(get_db)
+):
+    query = db.query(BlogPost).filter(BlogPost.is_published == True)
+
+    # 1. Filtrare după categorie (dacă nu e "all" sau "Toate postările")
+    if category and category not in ["all", "Toate postările"]:
+        # Folosim ilike pentru a fi siguri că găsim categoria indiferent de litere mari/mici
+        query = query.filter(BlogPost.category.ilike(f"%{category}%"))
+
+    # 2. Ordonare (cele mai noi primele)
+    query = query.order_by(BlogPost.created_at.desc())
+
+    # 3. Paginare
+    skip = (page - 1) * size
+    posts = query.offset(skip).limit(size).all()
+
+    return posts
