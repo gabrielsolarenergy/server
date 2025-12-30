@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, UploadFile, File, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
@@ -19,9 +19,27 @@ router = APIRouter(prefix="/solar", tags=["Solar Content"])
 
 # --- PROIECTE (Acces Public la Vizualizare) ---
 @router.get("/projects", response_model=List[ProjectOut])
-async def get_projects(db: Session = Depends(get_db)):
-    return db.query(Project).order_by(Project.created_at.desc()).all()
+async def get_projects(
+        category: Optional[str] = Query(None),  # Frontend trimite 'category'
+        page: int = Query(1, ge=1),
+        size: int = Query(6, ge=1),
+        db: Session = Depends(get_db)
+):
+    query = db.query(Project)
 
+    # 1. Aplicăm filtrul de categorie (dacă este trimis)
+    if category and category != "all":
+        # Folosim ilike pentru a fi case-insensitive și a ignora mici diferențe
+        query = query.filter(Project.category.ilike(f"%{category}%"))
+
+    # 2. Ordonăm după data creării
+    query = query.order_by(Project.created_at.desc())
+
+    # 3. Aplicăm paginarea
+    skip = (page - 1) * size
+    projects = query.offset(skip).limit(size).all()
+
+    return projects
 
 @router.get("/projects/{project_id}", response_model=ProjectOut)
 async def get_project(project_id: UUID, db: Session = Depends(get_db)):
