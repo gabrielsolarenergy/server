@@ -114,13 +114,6 @@ class ProjectOut(ProjectCreate):
 
 # --- BLOG SCHEMAS ---
 
-class BlogPostCreate(BaseModel):
-    title: str
-    content: str
-    category: str
-    tags: Optional[List[str]] = []
-    featured_image: Optional[str] = None
-    is_published: bool = False
 
 # În backend/app/schemas.py
 
@@ -196,3 +189,13 @@ class ServiceRequestsPagination(BaseModel):
     total_count: int
     total_pages: int
     current_page: int
+
+
+class BlogPostCreate(BaseModel):
+    title: str
+    content: str
+    category: str
+    featured_image: str
+    excerpt: Optional[str] = None
+    tags: Optional[str] = None
+    is_published: Optional[str] = "false"

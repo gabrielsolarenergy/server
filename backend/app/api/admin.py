@@ -11,7 +11,7 @@ from backend.app.core.security import require_role, get_current_active_user
 from backend.app.models.database import get_db, User, ContactLead, Project, BlogPost, AuditLog, ServiceRequest
 from backend.app.schemas import UserOut, UserStatusUpdate, UserUpdateSchema, \
     ServiceRequestOut, ServiceRequestUpdate, ContactLeadCreate, \
-    ServiceRequestsPagination  # Asigură-te că importi UserStatusUpdate
+    ServiceRequestsPagination, BlogPostCreate  # Asigură-te că importi UserStatusUpdate
 from backend.app.schemas import ContactLeadOut, ProjectOut
 from backend.app.utils.storage import upload_image_to_bucket
 
@@ -381,35 +381,26 @@ def generate_slug(title: str) -> str:
 
 @router.post("/blog", dependencies=[admin_dependency])
 async def create_blog_post(
-        title: str = Form(...),
-        content: str = Form(...),
-        category: str = Form(...),
-        excerpt: str = Form(None),
-        tags: str = Form(None),
-        is_published: str = Form("false"),
-        seo_title: str = Form(None),
-        seo_description: str = Form(None),
-        featured_image: str = Form(...), # AM SCHIMBAT DIN File ÎN Form (string)
+        post_data: BlogPostCreate, # Primește tot obiectul JSON odata
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_active_user)
 ):
     try:
-        published_bool = is_published.lower() == "true"
-        tags_list = [t.strip() for t in tags.split(",")] if tags else []
+        # Extragem datele din obiectul post_data
+        published_bool = post_data.is_published.lower() == "true"
+        tags_list = [t.strip() for t in post_data.tags.split(",")] if post_data.tags else []
 
         new_post = BlogPost(
-            title=title,
-            slug=generate_slug(title),
-            content=content,
-            excerpt=excerpt,
-            category=category,
+            title=post_data.title,
+            slug=generate_slug(post_data.title),
+            content=post_data.content,
+            excerpt=post_data.excerpt,
+            category=post_data.category,
             tags=tags_list,
-            featured_image=featured_image, # Folosim direct link-ul primit
+            featured_image=post_data.featured_image, # Acesta este link-ul string
             is_published=published_bool,
             published_at=datetime.utcnow() if published_bool else None,
-            author_id=current_user.id,
-            seo_title=seo_title,
-            seo_description=seo_description
+            author_id=current_user.id
         )
 
         db.add(new_post)
@@ -419,7 +410,6 @@ async def create_blog_post(
 
     except Exception as e:
         db.rollback()
-        print(f"Eroare detaliată Blog: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
