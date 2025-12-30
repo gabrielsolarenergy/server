@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Form, UploadFile, File
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.sql.functions import current_user
 
 from backend.app.core.security import require_role
 from backend.app.models.database import get_db, User, ContactLead, Project, BlogPost, AuditLog, ServiceRequest
@@ -412,7 +413,8 @@ async def create_blog_post(
             tags=tags_list,
             featured_image=image_url,
             is_published=published_bool,
-            published_at=datetime.utcnow() if published_bool else None
+            published_at=datetime.utcnow() if published_bool else None,
+        author_id = current_user.id
         )
         db.add(new_post)
         db.commit()

@@ -122,16 +122,25 @@ class BlogPostCreate(BaseModel):
     featured_image: Optional[str] = None
     is_published: bool = False
 
-class BlogPostOut(BlogPostCreate):
+# În backend/app/schemas.py
+
+class BlogPostOut(BaseModel):
     id: UUID
+    title: str
     slug: str
-    author_id: UUID
+    content: str
+    excerpt: Optional[str] = None
+    category: Optional[str] = None
+    tags: Optional[List[str]] = []
+    featured_image: Optional[str] = None
+    # SCHIMBĂ AICI:
+    author_id: Optional[UUID] = None  # Permite valoarea None
+    is_published: bool
     views_count: int
     created_at: datetime
 
     class Config:
         from_attributes = True
-
 class EmailVerification(BaseModel):
     email: EmailStr
     code: str
