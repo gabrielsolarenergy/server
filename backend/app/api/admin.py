@@ -344,14 +344,11 @@ async def create_project(
         investment_value: float = Form(None),
         status: str = Form("completed"),
         is_featured: bool = Form(False),
-        image: UploadFile = File(...),  # Fișierul imagine obligatoriu
+        image_url: str = Form(...),  # Primești direct URL-ul ca text
         db: Session = Depends(get_db)
 ):
     try:
-        # 1. Upload imagine în S3 și obținere URL
-        image_url = await upload_image_to_bucket(image)
-
-        # 2. Creare obiect Proiect
+        # Nu mai facem upload, folosim direct image_url primit din Form
         new_project = Project(
             title=title,
             description=description,
@@ -373,11 +370,9 @@ async def create_project(
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=f"Eroare la crearea proiectului: {str(e)}"
         )
-
-
 
 # Funcție utilitară pentru slug (dacă nu o ai deja importată)
 def generate_slug(title: str) -> str:
@@ -394,15 +389,12 @@ async def create_blog_post(
         is_published: str = Form("false"),
         seo_title: str = Form(None),
         seo_description: str = Form(None),
-        image: UploadFile = File(...),
+        featured_image: str = Form(...), # AM SCHIMBAT DIN File ÎN Form (string)
         db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_active_user)  # ADAUGĂ ACEASTA AICI
+        current_user: User = Depends(get_current_active_user)
 ):
     try:
-        # Conversie manuală din string în bool
         published_bool = is_published.lower() == "true"
-
-        image_url = await upload_image_to_bucket(image)
         tags_list = [t.strip() for t in tags.split(",")] if tags else []
 
         new_post = BlogPost(
@@ -412,10 +404,10 @@ async def create_blog_post(
             excerpt=excerpt,
             category=category,
             tags=tags_list,
-            featured_image=image_url,
+            featured_image=featured_image, # Folosim direct link-ul primit
             is_published=published_bool,
             published_at=datetime.utcnow() if published_bool else None,
-            author_id=current_user.id,  # ACUM VA FUNCȚIONA CORECT
+            author_id=current_user.id,
             seo_title=seo_title,
             seo_description=seo_description
         )
@@ -427,5 +419,5 @@ async def create_blog_post(
 
     except Exception as e:
         db.rollback()
-        print(f"Eroare detaliată Blog: {e}")  # Ajută la debug în consolă
+        print(f"Eroare detaliată Blog: {e}")
         raise HTTPException(status_code=500, detail=str(e))
