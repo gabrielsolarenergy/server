@@ -7,7 +7,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.sql.functions import current_user
 
-from backend.app.core.security import require_role
+from backend.app.core.security import require_role, get_current_active_user
 from backend.app.models.database import get_db, User, ContactLead, Project, BlogPost, AuditLog, ServiceRequest
 from backend.app.schemas import UserOut, UserStatusUpdate, UserUpdateSchema, \
     ServiceRequestOut, ServiceRequestUpdate, ContactLeadCreate, \
@@ -391,11 +391,12 @@ async def create_blog_post(
         category: str = Form(...),
         excerpt: str = Form(None),
         tags: str = Form(None),
-        is_published: str = Form("false"),  # Primit ca string de la FormData
+        is_published: str = Form("false"),
         seo_title: str = Form(None),
         seo_description: str = Form(None),
-        image: UploadFile = File(...),  # Numele cheii trebuie să fie 'image'
-        db: Session = Depends(get_db)
+        image: UploadFile = File(...),
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_active_user)  # ADAUGĂ ACEASTA AICI
 ):
     try:
         # Conversie manuală din string în bool
@@ -414,12 +415,17 @@ async def create_blog_post(
             featured_image=image_url,
             is_published=published_bool,
             published_at=datetime.utcnow() if published_bool else None,
-        author_id = current_user.id
+            author_id=current_user.id,  # ACUM VA FUNCȚIONA CORECT
+            seo_title=seo_title,
+            seo_description=seo_description
         )
+
         db.add(new_post)
         db.commit()
         db.refresh(new_post)
         return new_post
+
     except Exception as e:
         db.rollback()
+        print(f"Eroare detaliată Blog: {e}")  # Ajută la debug în consolă
         raise HTTPException(status_code=500, detail=str(e))
